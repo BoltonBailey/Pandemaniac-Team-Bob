@@ -11,6 +11,12 @@ class Game(object):
 	def __init__(self):
 		super(Game, self).__init__()
 
+		self.num_players = None
+		self.num_seeds = None
+		self.id = None
+
+		self.network = None
+
 
 	def get_degree(self, node):
 		return len(self.adjacency_dict[node])
@@ -100,7 +106,6 @@ class RandomPlayer(Player):
 		return list(selections)
 
 
-
 class HighDegreePlayer(Player):
 
 	def __init__(self):
@@ -152,6 +157,125 @@ class TwinAttackPlayer(Player):
 		assert len(selections) == game.num_seeds
 		return list(selections)
 
+class ClosenessPlayer(Player):
+
+	def __init__(self):
+		Player.__init__(self)
+
+	def give_output_list(self, game):
+		""" This returns a list of the selected nodes. The twin attack player
+		finds the highest degree nodes, and for each, it selects two
+		neighbors of that node and"""
+
+		nodes = nx.nodes(game.network)
+
+		nodes.sort(key=lambda x : nx.closeness_centrality(game.network, x), reverse=True)
+
+		selections = nodes[:game.num_seeds]
+
+		assert len(selections) == game.num_seeds
+		return list(selections)
+
+
+class BetweenessPlayer(Player):
+
+	def __init__(self):
+		Player.__init__(self)
+
+	def give_output_list(self, game):
+		""" This returns a list of the selected nodes. The twin attack player
+		finds the highest degree nodes, and for each, it selects two
+		neighbors of that node and"""
+
+		nodes = nx.nodes(game.network)
+
+		between_dict = nx.betweenness_centrality(game.network, len(nodes)/10)
+
+		nodes.sort(key=lambda x : between_dict[x], reverse=True)
+
+		selections = nodes[:game.num_seeds]
+
+		assert len(selections) == game.num_seeds
+		return list(selections)
+
+
+class FunctionPlayer(Player):
+	"""docstring for FunctionPlayer"""
+	def __init__(self, f):
+		super(FunctionPlayer, self).__init__()
+		# function that takes G and x
+		self.function = f
+
+	def give_output_list(self, game):
+		""" This returns a list of the selected nodes. The twin attack player
+		finds the highest degree nodes, and for each, it selects two
+		neighbors of that node and"""
+
+		nodes = nx.nodes(game.network)
+
+		nodes.sort(key=lambda x : self.function(game.network, x), reverse=True)
+
+		selections = nodes[:game.num_seeds]
+
+		assert len(selections) == game.num_seeds
+		return list(selections)
+
+
+
+class DictFunctionPlayer(Player):
+	"""docstring for DictFunctionPlayer"""
+	def __init__(self, f):
+		super(DictFunctionPlayer, self).__init__()
+		# function that takes G and x
+		self.function = f
+
+	def give_output_list(self, game):
+		""" This returns a list of the selected nodes. The twin attack player
+		finds the highest degree nodes, and for each, it selects two
+		neighbors of that node and"""
+
+		nodes = nx.nodes(game.network)
+
+		value_dict = self.function(game.network)
+
+		nodes.sort(key=lambda x : value_dict[x], reverse=True)
+
+		selections = nodes[:game.num_seeds]
+
+		assert len(selections) == game.num_seeds
+		return list(selections)
+
+
+class SmartPlayer(Player):
+	def __init__(self):
+		super(SmartPlayer, self).__init__()
+
+		self.game_memo_dict = {}
+
+	def give_output_list(self, game):
+		""" This returns a list of the selected nodes. The twin attack player
+		finds the highest degree nodes, and for each, it selects two
+		neighbors of that node and"""
+
+		if game in self.game_memo_dict:
+			return self.game_memo_dict[game]
+
+		nodes = nx.nodes(game.network)
+
+		value_dict = nx.degree_centrality(game.network)
+
+		nodes.sort(key=lambda x : value_dict[x], reverse=True)
+
+		candidate_nodes = nodes[:game.num_seeds * 2]
+
+		candidate_nodes.sort(key=lambda x : nx.closeness_centrality(game.network, x), reverse=True)
+
+		selections = candidate_nodes[:game.num_seeds]
+
+		assert len(selections) == game.num_seeds
+		self.game_memo_dict[game] = selections
+
+		return list(selections)
 
 
 def play(game, playerlist):
@@ -165,6 +289,8 @@ def play(game, playerlist):
 	for i, player in enumerate(playerlist):
 		nodes["strategy" + str(i)] = player.give_output_list(game)
 		assert len(nodes["strategy" + str(i)]) == game.num_seeds
+		#print nodes["strategy" + str(i)]
+	#print
 
 	result = sim.run(graph, nodes)
 
@@ -233,8 +359,9 @@ def test_2p_5s_100n(playerlist):
 				 	wins[player2] += 1
 
 
-	for player in playerlist:
-		print "score", wins[player]
+		for player in playerlist:
+			print "score", wins[player]
+		print
 
 
 def report_on_given_graphs():
@@ -251,6 +378,19 @@ def report_on_given_graphs():
 	game_list.append(game_from_file("game_files/friday/8.20.2.json"))
 	game_list.append(game_from_file("game_files/friday/8.35.1.json"))
 
+	game_list.append(game_from_file("game_files/saturday/2.5.2.json"))
+	game_list.append(game_from_file("game_files/saturday/2.10.11.json"))
+	game_list.append(game_from_file("game_files/saturday/2.10.21.json"))
+	game_list.append(game_from_file("game_files/saturday/2.10.31.json"))
+	game_list.append(game_from_file("game_files/saturday/4.5.2.json"))
+	game_list.append(game_from_file("game_files/saturday/4.10.2.json"))
+	game_list.append(game_from_file("game_files/saturday/8.10.2.json"))
+	game_list.append(game_from_file("game_files/saturday/8.20.3.json"))
+	game_list.append(game_from_file("game_files/saturday/8.25.1.json"))
+	game_list.append(game_from_file("game_files/saturday/8.35.2.json"))
+
+
+
 	for game in game_list:
 		print "Number of nodes:", len(nx.nodes(game.network))
 
@@ -263,10 +403,61 @@ def report_on_given_graphs():
 	for game in game_list:
 		print "Average connection probability:", float(2 * len(nx.edges(game.network)))/ len(nx.nodes(game.network))**2
 
+	for game in game_list:
+		print "Num connected components:", len(list(nx.connected_components(game.network)))
 
 def main():
-	#report_on_given_graphs()
-	test_2p_5s_100n([RandomPlayer(), HighDegreePlayer(), TwinAttackPlayer()])
+	report_on_given_graphs()
+	closeness_centrality_player = FunctionPlayer(nx.closeness_centrality)
+
+	degree_centrality_player = DictFunctionPlayer(nx.degree_centrality)
+
+	# Doesn't work on unconnected graphs
+	# current_flow_closeness_centrality_player = DictFunctionPlayer(nx.current_flow_closeness_centrality)
+	# eigenvector_centrality_player = DictFunctionPlayer(nx.eigenvector_centrality)
+	#
+	# def converted_katz_centrality(graph):
+	# 	dict = {}
+	# 	try:
+	# 		dict = nx.katz_centrality(graph)
+	# 	except:
+	# 		dict = nx.degree_centrality(graph)
+	# 	return dict
+	#
+	# katz_centrality_player = DictFunctionPlayer(converted_katz_centrality)
+	# communicability_centrality_player = DictFunctionPlayer(nx.communicability_centrality)
+	# load_centrality_player = DictFunctionPlayer(nx.load_centrality)
+	#
+	#
+
+	# print play(
+	# 	game_from_file("game_files/friday/8.35.1.json"),
+	# 	[
+	# 		degree_centrality_player,
+	# 		SmartPlayer(),
+	# 		degree_centrality_player,
+	# 		RandomPlayer(),
+	# 		RandomPlayer(),
+	# 		RandomPlayer(),
+	# 		RandomPlayer(),
+	# 		RandomPlayer()
+	# 	])
+
+	# SmartPlayer().give_50_output_to_file(game_from_file("game_files/saturday/2.5.2.json"))
+	#
+	# SmartPlayer().give_50_output_to_file(game_from_file("game_files/saturday/4.5.2.json"))
+	# SmartPlayer().give_50_output_to_file(game_from_file("game_files/saturday/4.10.2.json"))
+	#
+	# SmartPlayer().give_50_output_to_file(game_from_file("game_files/saturday/2.10.11.json"))
+	# SmartPlayer().give_50_output_to_file(game_from_file("game_files/saturday/2.10.21.json"))
+	# SmartPlayer().give_50_output_to_file(game_from_file("game_files/saturday/2.10.31.json"))
+
+	# SmartPlayer().give_50_output_to_file(game_from_file("game_files/saturday/8.10.2.json"))
+	# SmartPlayer().give_50_output_to_file(game_from_file("game_files/saturday/8.20.3.json"))
+	# SmartPlayer().give_50_output_to_file(game_from_file("game_files/saturday/8.25.1.json"))
+	# SmartPlayer().give_50_output_to_file(game_from_file("game_files/saturday/8.35.2.json"))
+
+	#test_2p_5s_100n([degree_centrality_player, closeness_centrality_player, SmartPlayer()])
 
 if __name__ == '__main__':
 	main()
