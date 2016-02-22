@@ -278,6 +278,56 @@ class SmartPlayer(Player):
 		return list(selections)
 
 
+class BeatDegreePlayer(Player):
+	"""docstring for BeatDegreePlayer"""
+	def __init__(self):
+		super(BeatDegreePlayer, self).__init__()
+
+		self.game_memo_dict = {}
+
+	def give_output_list(self, game):
+		""" This returns a list of the selected nodes. The twin attack player
+		finds the highest degree nodes, and for each, it selects two
+		neighbors of that node and"""
+
+		# First, find out what the TA is doing.
+
+		if game in self.game_memo_dict:
+			return self.game_memo_dict[game]
+
+		nodes = nx.nodes(game.network)
+
+		value_dict = nx.degree_centrality(game.network)
+		nodes.sort(key=lambda x : value_dict[x], reverse=True)
+
+		ta_output_list = nodes[:game.num_seeds]
+
+
+
+		candidate_nodes = nodes[:25]
+
+		i = 0
+		while i < 10000000:
+			i += 1
+
+			selections = set()
+			while len(selections) < game.num_seeds:
+				selections.add(random.choice(candidate_nodes))
+			selections = list(selections)
+
+			result = sim.run(nx.to_dict_of_lists(game.network), {"s0" : ta_output_list, "s1" : selections})
+
+			if result["s0"] < result["s1"]:
+				break
+
+
+		assert len(selections) == game.num_seeds
+		self.game_memo_dict[game] = selections
+
+		return list(selections)
+
+
+
 def play(game, playerlist):
 
 	assert game.num_players == len(playerlist)
@@ -407,7 +457,7 @@ def report_on_given_graphs():
 		print "Num connected components:", len(list(nx.connected_components(game.network)))
 
 def main():
-	report_on_given_graphs()
+	# report_on_given_graphs()
 	closeness_centrality_player = FunctionPlayer(nx.closeness_centrality)
 
 	degree_centrality_player = DictFunctionPlayer(nx.degree_centrality)
@@ -448,7 +498,7 @@ def main():
 	# SmartPlayer().give_50_output_to_file(game_from_file("game_files/saturday/4.5.2.json"))
 	# SmartPlayer().give_50_output_to_file(game_from_file("game_files/saturday/4.10.2.json"))
 	#
-	# SmartPlayer().give_50_output_to_file(game_from_file("game_files/saturday/2.10.11.json"))
+	BeatDegreePlayer().give_50_output_to_file(game_from_file("game_files/sunday/2.10.12.json"))
 	# SmartPlayer().give_50_output_to_file(game_from_file("game_files/saturday/2.10.21.json"))
 	# SmartPlayer().give_50_output_to_file(game_from_file("game_files/saturday/2.10.31.json"))
 
@@ -457,7 +507,9 @@ def main():
 	# SmartPlayer().give_50_output_to_file(game_from_file("game_files/saturday/8.25.1.json"))
 	# SmartPlayer().give_50_output_to_file(game_from_file("game_files/saturday/8.35.2.json"))
 
-	#test_2p_5s_100n([degree_centrality_player, closeness_centrality_player, SmartPlayer()])
+	# test_2p_5s_100n([degree_centrality_player, BeatDegreePlayer()])
+	# print play(game_from_file("game_files/saturday/2.10.11.json"), [degree_centrality_player, BeatDegreePlayer()])
+	# print play(game_from_file("game_files/friday/2.10.10.json"), [degree_centrality_player, BeatDegreePlayer()])
 
 if __name__ == '__main__':
 	main()
